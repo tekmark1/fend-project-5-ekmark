@@ -44,17 +44,27 @@ var venueList = ko.observableArray([
 		}
 ]);
 
-
-
-var VenueListView = function(data) {
+/*VenueListView = function(data) {
 	this.name = ko.observable(data.name);
 	this.latlng = ko.observable(data.latlng);
 	this.id = ko.observable(data.id);
 };
 
 
+var ViewModel = function() {
+
+	var self = this;
+
+	this.venues = ko.observableArray([]);
+
+	venueList().forEach(function(venueItem){
+		self.venues.push( new VenueListView(venueItem) );
+	});
+
+};*/
 
 var createMarkers = function(position, name, street, city) {
+
 	var marker = new google.maps.Marker({
 		animation: google.maps.Animation.DROP,
 		position: position,
@@ -71,6 +81,11 @@ var createMarkers = function(position, name, street, city) {
 		};
 	};
 
+
+	var $listArea = $('#venue-list');
+	$listArea.append('<li id="' + name + '">' + name + '<li>');
+
+
 	var wikiUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + name + '&limit=3&format=json&callback=wikiCallback';
 	$.ajax({
 		url: wikiUrl,
@@ -78,26 +93,36 @@ var createMarkers = function(position, name, street, city) {
 		success: function( response ) {
 
 
-			var articleList = response[1];
+				var articleList = response[1];
 
-			var articleStr = articleList[0];
+				var	articleStr = articleList[0];
 						
-			var url = 'http://en.wikipedia.org/wiki/' + articleStr;
+				var url = 'http://en.wikipedia.org/wiki/' + articleStr;
 
-			var address = street + "," + city;
-			var streetviewURL = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
-			var infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetviewURL + "'><div id='wikiLinks'><li><a href='" + url + "'>" + articleStr + "</a></li></div></div>";
-			var infowindow = new google.maps.InfoWindow({
-				content: infowindowContent
-			});
-			marker.addListener('click', function() {
-				infowindow.open(map, marker);
-			});
+				var address = street + "," + city;
+				var streetviewURL = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
+				var infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetviewURL + "'><div id='wikiLinks'><li><a href='" + url + "'>" + articleStr + "</a></li></div></div>";
+				var infowindow = new google.maps.InfoWindow({
+					content: infowindowContent
+				});
+				marker.addListener('click', function() {
+					infowindow.open(map, marker);
+				});
+
+				document.getElementById("venue-list").addEventListener('click', function(e) {
+					if (e.target && e.target.innerHTML == name) {
+						infowindow.open(map, marker)
+					};
+				});
+
 		}
 	});
 
+
+
 };
 
+var markerItems = ko.observableArray();
 
 var map;
 
@@ -109,31 +134,15 @@ var initMap = function() {
 		zoom: 15
 	});
 
-	var markerItems = [];
-	markerItems.push(
+
+	markerItems().push(
 		new createMarkers(venueList()[0].latlng, venueList()[0].name, venueList()[0].street, venueList()[0].city), 
 		new createMarkers(venueList()[1].latlng, venueList()[1].name, venueList()[1].street, venueList()[1].city),
 		new createMarkers(venueList()[2].latlng, venueList()[2].name, venueList()[2].street, venueList()[2].city),
 		new createMarkers(venueList()[3].latlng, venueList()[3].name, venueList()[3].street, venueList()[3].city),
 		new createMarkers(venueList()[4].latlng, venueList()[4].name, venueList()[4].street, venueList()[4].city)
 	);
-	console.log(markerItems);
+
 };
 
-
-var ViewModel = function() {
-
-	var self = this;
-
-	this.venues = ko.observableArray([]);
-
-	venueList().forEach(function(venueItem){
-		self.venues.push( new VenueListView(venueItem) );
-	});
-
-	this.markerArray = ko.observableArray([]);
-	
-};
-
-
-ko.applyBindings(ViewModel());
+console.log(markerItems());
