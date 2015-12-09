@@ -1,73 +1,95 @@
 /* ======= Model ======= */
 
-var venueList = ko.observableArray([
+var venueList = [
 
 		{
 			name : 'LA Fitness',
 			latlng : {lat: 33.100049, lng: -96.803555},
 			street : '9190 TX-121',
 			city : 'Frisco',
-			id : 'ChIJtRvafug8TIYReEVgHkaNN1M',
-			marker: null
+			id : 0	
 		},
 		{
 			name : 'In-N-Out Burger',
 			latlng : {lat: 33.101787, lng: -96.804414},
 			street : '2800 Preston Rd',
 			city : 'Frisco',
-			id : 'ChIJWYMPi-fJj4ARscYl1OrSaTc',
-			marker : null	
+			id : 1		
 		},
 		{
 			name : 'Dr. Pepper Ballpark',
 			latlng : {lat: 33.098322, lng: -96.819745},
 			street : '7300 Roughriders Trail',
 			city : 'Frisco',
-			id : 'ChIJvUQAkJY8TIYRLygohdxesrg',
-			marker : null
+			id : 2
 		},
 		{
 			name : 'IKEA Dallas',
 			latlng : {lat: 33.093828, lng: -96.821247},
 			street : '7171 Ikea Dr',
 			city : 'Frisco',
-			id : 'ChIJN42Gm708TIYRp7zdNGJzkgg',
-			marker : null
+			id : 3
 		},
 		{
 			name : 'Stonebriar Centre',
 			latlng : {lat: 33.098718, lng: -96.811076},
 			street : '2601 Preston Rd',
 			city : 'Frisco',
-			id : 'ChIJ420EDus8TIYRLnGI1cgPeeQ',
-			marker : null
+			id : 4	
 		}
-]);
+];
 
-/*VenueListView = function(data) {
-	this.name = ko.observable(data.name);
-	this.latlng = ko.observable(data.latlng);
-	this.id = ko.observable(data.id);
-};
-
+var infowindow;
+var markers = [];
 
 var ViewModel = function() {
-
 	var self = this;
 
 	this.venues = ko.observableArray([]);
 
-	venueList().forEach(function(venueItem){
-		self.venues.push( new VenueListView(venueItem) );
+	venueList.forEach(function(venueItem) {
+		self.venues.push( new createMarkers(venueItem) );
 	});
 
-};*/
+	this.linkMarker = function(id) {
+		google.maps.event.trigger(markers[id], 'click');
+	};
 
-var createMarkers = function(position, name, street, city) {
+	this.query = ko.observable('');
+
+	this.filterMarkers = ko.computed(function() {
+
+		var search = self.query().toLowerCase();
+
+		return ko.utils.arrayFilter(self.venues(), function(marker) {
+			var doesMatch = marker.name().toLowerCase().indexOf(search) >= 0;
+
+			marker.isVisible(doesMatch);
+
+			return doesMatch;
+		});
+	});
+};
+
+
+var createMarkers = function(data) {
+
+	var self = this;
+
+	infowindow = new google.maps.InfoWindow;
+
+	this.name = ko.observable(data.name);
+	this.street = ko.observable(data.street);
+	this.city = ko.observable(data.city);
+	this.latlng = ko.observable(data.latlng);
+	this.id = ko.observable(data.id);
+
+	var latlng = self.latlng();
+
 
 	var marker = new google.maps.Marker({
 		animation: google.maps.Animation.DROP,
-		position: position,
+		position: latlng,
 		map: map
 	});
 	marker.addListener('click', toggleBounce);
@@ -81,11 +103,7 @@ var createMarkers = function(position, name, street, city) {
 		};
 	};
 
-
-	var $listArea = $('#venue-list');
-	$listArea.append('<li id="' + name + '">' + name + '<li>');
-
-
+	var name = self.name();
 	var wikiUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + name + '&limit=3&format=json&callback=wikiCallback';
 	$.ajax({
 		url: wikiUrl,
@@ -95,34 +113,41 @@ var createMarkers = function(position, name, street, city) {
 
 				var articleList = response[1];
 
-				var	articleStr = articleList[0];
+				var articleStr = articleList[0];
 						
 				var url = 'http://en.wikipedia.org/wiki/' + articleStr;
-
+				var street = self.street();
+				var city = self.city();
 				var address = street + "," + city;
 				var streetviewURL = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
 				var infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetviewURL + "'><div id='wikiLinks'><li><a href='" + url + "'>" + articleStr + "</a></li></div></div>";
-				var infowindow = new google.maps.InfoWindow({
-					content: infowindowContent
-				});
+				
+			
 				marker.addListener('click', function() {
+					infowindow.setContent(infowindowContent);
 					infowindow.open(map, marker);
 				});
-
-				document.getElementById("venue-list").addEventListener('click', function(e) {
-					if (e.target && e.target.innerHTML == name) {
-						infowindow.open(map, marker)
-					};
-				});
-
 		}
-	});
+    });
 
+    this.isVisible = ko.observable(false);
 
+    this.isVisible.subscribe(function(currentState) {
+    	if (currentState) {
+    		marker.setMap(map);
+    	} else {
+    		marker.setMap(null);
+    	}
+    });
 
+    this.isVisible(true);
+
+    this.marker = ko.observable(marker);
+
+    markers.push(marker);
 };
 
-var markerItems = ko.observableArray();
+
 
 var map;
 
@@ -134,15 +159,13 @@ var initMap = function() {
 		zoom: 15
 	});
 
-
-	markerItems().push(
-		new createMarkers(venueList()[0].latlng, venueList()[0].name, venueList()[0].street, venueList()[0].city), 
-		new createMarkers(venueList()[1].latlng, venueList()[1].name, venueList()[1].street, venueList()[1].city),
-		new createMarkers(venueList()[2].latlng, venueList()[2].name, venueList()[2].street, venueList()[2].city),
-		new createMarkers(venueList()[3].latlng, venueList()[3].name, venueList()[3].street, venueList()[3].city),
-		new createMarkers(venueList()[4].latlng, venueList()[4].name, venueList()[4].street, venueList()[4].city)
-	);
+	google.maps.event.addListener(map, 'click', function() {
+        infowindow.close();
+    });
 
 };
 
-console.log(markerItems());
+function runApp() {
+	initMap();
+	ko.applyBindings(new ViewModel());
+};
