@@ -39,24 +39,30 @@ var venueList = [
 		}
 ];
 
+//create global infowindow variable and markers array to access
 var infowindow;
 var markers = [];
 
 var ViewModel = function() {
 	var self = this;
 
+	//observable array for instantiated marker objects
 	this.venues = ko.observableArray([]);
 
+	//push new marker objects into array
 	venueList.forEach(function(venueItem) {
 		self.venues.push( new createMarkers(venueItem) );
 	});
 
+	//function that triggers 'click' events created in createMarkers by using marker id number
 	this.linkMarker = function(id) {
 		google.maps.event.trigger(markers[id], 'click');
 	};
 
+	//search bar query
 	this.query = ko.observable('');
 
+	//filter marker and list names when they match text inputed into search bar
 	this.filterMarkers = ko.computed(function() {
 
 		var search = self.query().toLowerCase();
@@ -71,13 +77,14 @@ var ViewModel = function() {
 	});
 };
 
-
+//markers class 
 var createMarkers = function(data) {
 
 	var self = this;
 
 	infowindow = new google.maps.InfoWindow;
 
+	//make inputed data observable
 	this.name = ko.observable(data.name);
 	this.street = ko.observable(data.street);
 	this.city = ko.observable(data.city);
@@ -92,6 +99,8 @@ var createMarkers = function(data) {
 		position: latlng,
 		map: map
 	});
+
+	//animate marker
 	marker.addListener('click', toggleBounce);
 
 	function toggleBounce() {
@@ -103,6 +112,7 @@ var createMarkers = function(data) {
 		};
 	};
 
+	//ajax for wikipedia api
 	var name = self.name();
 	var wikiUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + name + '&limit=3&format=json&callback=wikiCallback';
 	$.ajax({
@@ -111,25 +121,26 @@ var createMarkers = function(data) {
 		success: function( response ) {
 
 
-				var articleList = response[1];
+			var articleList = response[1];
 
-				var articleStr = articleList[0];
+			var articleStr = articleList[0];
 						
-				var url = 'http://en.wikipedia.org/wiki/' + articleStr;
-				var street = self.street();
-				var city = self.city();
-				var address = street + "," + city;
-				var streetviewURL = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
-				var infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetviewURL + "'><div id='wikiLinks'><li><a href='" + url + "'>" + articleStr + "</a></li></div></div>";
+			var url = 'http://en.wikipedia.org/wiki/' + articleStr;
+			var street = self.street();
+			var city = self.city();
+			var address = street + "," + city;
+			var streetviewURL = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
+			var infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetviewURL + "'><div id='wikiLinks'><li><a href='" + url + "'>" + articleStr + "</a></li></div></div>";
 				
-			
-				marker.addListener('click', function() {
-					infowindow.setContent(infowindowContent);
-					infowindow.open(map, marker);
-				});
+			//set infowindow content with wikipedia and streetview info and open infowindow when clicked
+			marker.addListener('click', function() {
+				infowindow.setContent(infowindowContent);
+				infowindow.open(map, marker);
+			});
 		}
     });
 
+	//set visibility of marker; used in ViewModel to filter markers
     this.isVisible = ko.observable(false);
 
     this.isVisible.subscribe(function(currentState) {
@@ -147,10 +158,9 @@ var createMarkers = function(data) {
     markers.push(marker);
 };
 
-
-
 var map;
 
+//create map and event listener to close other window if another marker is clicked
 var initMap = function() {
 	var self = this;
 
@@ -165,6 +175,7 @@ var initMap = function() {
 
 };
 
+//wrap initMap() and ko bindings in a function so they can be run with google.api callback
 function runApp() {
 	initMap();
 	ko.applyBindings(new ViewModel());
