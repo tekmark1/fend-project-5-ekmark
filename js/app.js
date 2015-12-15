@@ -68,7 +68,8 @@ var ViewModel = function() {
 	//into this array. This array will then be used by model.generateHTML to create infowindowContent.
 	this.articleList = ko.observableArray();
 
-	//
+	//the information that is collected in this function will be supplied to self.articleList for generateHTML;
+	//this information will be gathered in the apiData ajax call.
 	this.article = function(name, url, streetview, content) {
 		this.name = name;
 		this.url = url;
@@ -76,8 +77,10 @@ var ViewModel = function() {
 		this.content = content;
 	}
 
+	//create infowindow object
 	var infowindow = new google.maps.InfoWindow();
 
+	//function that contains marker information
 	this.createMarker = function(name, latlng, id, address) {
 		
 		this.identifier = ko.observable(name);
@@ -93,23 +96,23 @@ var ViewModel = function() {
 			map: map
 		});
 
+		//sets visibility for filtering purposes
 		this.isVisible = ko.observable(false);
 
-    	this.isVisible.subscribe(function(currentState) {
-    		if (currentState) {
-    			marker.setMap(map);
-    		} else {
-    			marker.setMap(null);
-    		}
-    	});
+    		this.isVisible.subscribe(function(currentState) {
+    			if (currentState) {
+    				marker.setMap(map);
+    			} else {
+    				marker.setMap(null);
+    			}
+    		});
 
-    	this.isVisible(true);
+    		this.isVisible(true);
 
-    	this.marker = marker;
-
+    		this.marker = marker;
 	};
 
-
+	//Instantiate markers into array
 	this.markers = [
 		new self.createMarker(venueList[0].name, venueList[0].latlng, venueList[0].id, venueList[0].address),
 		new self.createMarker(venueList[1].name, venueList[1].latlng, venueList[1].id, venueList[1].address),
@@ -118,6 +121,7 @@ var ViewModel = function() {
 		new self.createMarker(venueList[4].name, venueList[4].latlng, venueList[4].id, venueList[4].address)
 	];
 
+	//place this.markers array into observable array
 	this.markerArray = ko.observableArray(self.markers);
 
 	this.query = ko.observable('');
@@ -136,60 +140,74 @@ var ViewModel = function() {
 		});
 	});
 
+	//a function which accepts an input and creates an ajax call for that input
 	this.apiData = function(marker) {
 
 		var wikiUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + marker.name + '&limit=3&format=json&callback=wikiCallback';
 		
-
-
+		//ajax parameters
 		parameters = {
 			url: wikiUrl,
 			dataType: "jsonp",
 			success: function( response ) {
 
+				//remove all of the information in the self.articleList array to get it ready for new input
 				self.articleList.removeAll();
+
+				//set a variable which is equal to response and set a variable to equal the first response
 				var articles = response[1];
 				var content = articles[0];
+
+				//set wikipedia url for infowindow
 				var url = 'http://en.wikipedia.org/wiki/' + content;
+
+				//set url for google streetview
 				var streetViewUrl = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + marker.address + "";
 
+				//push ajax info into self.articleList using self.article;
 				self.articleList.push(new self.article(marker.name, url, streetViewUrl, content));
 				
 			},
+			//error function to be completed upon error
+			//error outputs are designated based upon the status of the error
 			error: function(jqXHR, exception) {
 
 				self.articleList.removeAll();
 				var wikiFail = '';
-			
 		        	if (jqXHR.status === 0) {
-		        		wikiFail = 'Not connect.\n Verify Network.';
+		        	 	wikiFail = 'Not connect.\n Verify Network.';
 		        	} else if (jqXHR.status == 404) {
 		            		wikiFail = 'Requested page not found. [404]';
-		        	} else if (jqXHR.status == 500) {
+				} else if (jqXHR.status == 500) {
 		            		wikiFail = 'Internal Server Error [500].';
-				} else if (exception === 'parsererror') {
+		        	} else if (exception === 'parsererror') {
 		            		wikiFail = 'Requested JSON parse failed.';
 		        	} else if (exception === 'timeout') {
 		            		wikiFail = 'Time out error.';
 		        	} else if (exception === 'abort') {
-		            		wikiFail = 'Ajax request aborted.';
+		        		wikiFail = 'Ajax request aborted.';
 		        	} else {
 		            		wikiFail = 'Uncaught Error.\n';
-				}
+		        	}
 		        	self.articleList.push(wikiFail);
 	        	} 
 		};
 		$.ajax(parameters);
 	};
 
+	//function to be used for data-binds on list items
 	self.openInfoWindow = function(marker) {
+		//make ajax call for clicked list item
 		self.apiData(marker);
 
+		//wait 300ms for ajax call to be finished and then open infowindow with HTML string
+		//generated from HTML.generateHTML
 		window.setTimeout(function() {
 			infowindow.setContent(HTML.generateHTML(self.articleList()));
 			infowindow.open(map, marker.marker);
 		}, 300);
 
+		//create toggleBounce animation for marker when list item is clicked
 		if (marker.marker.getAnimation() !== null) {
 			marker.marker.setAnimation(null);
 		} else {
@@ -198,6 +216,9 @@ var ViewModel = function() {
 		};
 	};
 
+	//using an IIFE statement, every marker in self.markers will have a click function which opens
+	//the infowindow with information for that marker.
+	//also includes toggleBounce animation for markers
 	for (var i = 0; i < self.markers.length; i++) {
 
 		var indexedNumber = self.markers[i]
@@ -236,18 +257,20 @@ var initMap = function() {
 	});
 
 	google.maps.event.addListener(map, 'click', function() {
-        infowindow.close();
+        	infowindow.close();
     });
 
 };
 
+//create an error statement if google comes back as undefines
+//this function is placed in the google.maps.api script in index.html
 function googleError() {
 
 	var $errorMap = $('#map');
 
 	if (typeof google === 'undefined') {
-    	$errorMap.append('<h2>Error loading or retrieving Google Map</h2>');
-    };
+    		$errorMap.append('<h2>Error loading or retrieving Google Map</h2>');
+    	};
 }
 
 //wrap initMap() and ko bindings in a function so they can be run with google.api callback
@@ -255,3 +278,4 @@ function runApp() {
 	initMap();
 	ko.applyBindings(new ViewModel());
 };
+
