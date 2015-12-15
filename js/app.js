@@ -5,61 +5,115 @@ var venueList = [
 		{
 			name : 'LA Fitness',
 			latlng : {lat: 33.100049, lng: -96.803555},
-			street : '9190 TX-121',
-			city : 'Frisco',
+			address : '9190 TX-121, Frisco',
 			id : 0	
 		},
 		{
 			name : 'In-N-Out Burger',
 			latlng : {lat: 33.101787, lng: -96.804414},
-			street : '2800 Preston Rd',
-			city : 'Frisco',
+			address : '2800 Preston Rd, Frisco',
 			id : 1		
 		},
 		{
 			name : 'Dr. Pepper Ballpark',
 			latlng : {lat: 33.098322, lng: -96.819745},
-			street : '7300 Roughriders Trail',
-			city : 'Frisco',
+			address : '7300 Roughriders Trail, Frisco',
 			id : 2
 		},
 		{
 			name : 'IKEA Dallas',
 			latlng : {lat: 33.093828, lng: -96.821247},
-			street : '7171 Ikea Dr',
-			city : 'Frisco',
+			address : '7171 Ikea Dr, Frisco',
 			id : 3
 		},
 		{
 			name : 'Stonebriar Centre',
 			latlng : {lat: 33.098718, lng: -96.811076},
-			street : '2601 Preston Rd',
-			city : 'Frisco',
+			address : '2601 Preston Rd, Frisco',
 			id : 4	
 		}
 ];
 
-//create global infowindow variable and markers array to access
-var infowindow;
-var markers = [];
+function HTMLModel() {
+
+	this.generateHTML = function(articles) {
+
+		var infowindowContent = "";
+
+		for (var i = 0; i < articles.length; i++) {
+
+			var content = articles[i].content;
+			var name = articles[i].name;
+			var url = articles[i].url;
+			var address = articles[i].address;
+			var streetViewUrl = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
+
+			infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetViewUrl + "'><div id='wikilinks'><li><a href='" + url + "''>" + content + "</a></li></div></div>";
+		};
+
+		return infowindowContent;
+	};
+};
+
+var HTML = new HTMLModel();
 
 var ViewModel = function() {
+
 	var self = this;
 
-	//observable array for instantiated marker objects
-	this.venues = ko.observableArray([]);
+	this.articleList = ko.observableArray();
 
-	//push new marker objects into array
-	venueList.forEach(function(venueItem) {
-		self.venues.push( new createMarkers(venueItem) );
-	});
+	this.article = function(name, url, address, content) {
+		this.name = name;
+		this.url = url;
+		this.address = address;
+		this.content = content;
+	}
 
-	//function that triggers 'click' events created in createMarkers by using marker id number
-	this.linkMarker = function(id) {
-		google.maps.event.trigger(markers[id], 'click');
+	var infowindow = new google.maps.InfoWindow();
+
+	this.createMarker = function(name, latlng, id, address) {
+		
+		this.identifier = ko.observable(name);
+
+		this.name = name;
+		this.latlng = latlng;
+		this.id = id;
+		this.address = address;
+
+		var marker = new google.maps.Marker({
+			animation: google.maps.Animation.DROP,
+			position: latlng,
+			map: map
+		});
+
+		this.isVisible = ko.observable(false);
+
+    	this.isVisible.subscribe(function(currentState) {
+    		if (currentState) {
+    			marker.setMap(map);
+    		} else {
+    			marker.setMap(null);
+    		}
+    	});
+
+    	this.isVisible(true);
+
+    	this.marker = marker;
+
 	};
 
-	//search bar query
+
+	this.markers = [
+		new self.createMarker(venueList[0].name, venueList[0].latlng, venueList[0].id, venueList[0].address),
+		new self.createMarker(venueList[1].name, venueList[1].latlng, venueList[1].id, venueList[1].address),
+		new self.createMarker(venueList[2].name, venueList[2].latlng, venueList[2].id, venueList[2].address),
+		new self.createMarker(venueList[3].name, venueList[3].latlng, venueList[3].id, venueList[3].address),
+		new self.createMarker(venueList[4].name, venueList[4].latlng, venueList[4].id, venueList[4].address)
+	];
+
+	this.markerArray = ko.observableArray(self.markers);
+
 	this.query = ko.observable('');
 
 	//filter marker and list names when they match text inputed into search bar
@@ -67,95 +121,78 @@ var ViewModel = function() {
 
 		var search = self.query().toLowerCase();
 
-		return ko.utils.arrayFilter(self.venues(), function(marker) {
-			var doesMatch = marker.name().toLowerCase().indexOf(search) >= 0;
+		return ko.utils.arrayFilter(self.markerArray(), function(marker) {
+			var doesMatch = marker.identifier().toLowerCase().indexOf(search) >= 0;
 
 			marker.isVisible(doesMatch);
 
 			return doesMatch;
 		});
 	});
-};
 
-//markers class 
-var createMarkers = function(data) {
+	this.apiData = function(marker) {
 
-	var self = this;
+		var wikiUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + marker.name + '&limit=3&format=json&callback=wikiCallback';
+		
+		var wikiFail = 'Failed to get Wikipedia resources';
 
-	infowindow = new google.maps.InfoWindow;
+		parameters = {
+			url: wikiUrl,
+			dataType: "jsonp",
+			success: function( response ) {
 
-	//make inputed data observable
-	this.name = ko.observable(data.name);
-	this.street = ko.observable(data.street);
-	this.city = ko.observable(data.city);
-	this.latlng = ko.observable(data.latlng);
-	this.id = ko.observable(data.id);
+				self.articleList.removeAll();
+				var articles = response[1];
+				var content = articles[0];
+				var url = 'http://en.wikipedia.org/wiki/' + content;
 
-	var latlng = self.latlng();
+				self.articleList.push(new self.article(marker.name, url, marker.address, content));
+				
+			}
+		};
+		$.ajax(parameters);
+	};
 
+	self.openInfoWindow = function(marker) {
+		self.apiData(marker);
 
-	var marker = new google.maps.Marker({
-		animation: google.maps.Animation.DROP,
-		position: latlng,
-		map: map
-	});
+		window.setTimeout(function() {
+			infowindow.setContent(HTML.generateHTML(self.articleList()));
+			infowindow.open(map, marker.marker);
+		}, 300);
 
-	//animate marker
-	marker.addListener('click', toggleBounce);
-
-	function toggleBounce() {
-		if (marker.getAnimation() !== null) {
-			marker.setAnimation(null);
+		if (marker.marker.getAnimation() !== null) {
+			marker.marker.setAnimation(null);
 		} else {
-			marker.setAnimation(google.maps.Animation.BOUNCE);
-			setTimeout(function() { marker.setAnimation(null); }, 1450);
+			marker.marker.setAnimation(google.maps.Animation.BOUNCE);
+			setTimeout(function() { marker.marker.setAnimation(null); }, 1450);
 		};
 	};
 
-	//ajax for wikipedia api
-	var name = self.name();
-	var wikiUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + name + '&limit=3&format=json&callback=wikiCallback';
-	$.ajax({
-		url: wikiUrl,
-		dataType: "jsonp",
-		success: function( response ) {
+	for (var i = 0; i < self.markers.length; i++) {
 
+		var indexedNumber = self.markers[i]
 
-			var articleList = response[1];
+		indexedNumber.marker.addListener('click', (function(markerCopy) {
+			
+			return function() {
+				self.apiData(markerCopy);
 
-			var articleStr = articleList[0];
-						
-			var url = 'http://en.wikipedia.org/wiki/' + articleStr;
-			var street = self.street();
-			var city = self.city();
-			var address = street + "," + city;
-			var streetviewURL = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
-			var infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetviewURL + "'><div id='wikiLinks'><li><a href='" + url + "'>" + articleStr + "</a></li></div></div>";
-				
-			//set infowindow content with wikipedia and streetview info and open infowindow when clicked
-			marker.addListener('click', function() {
-				infowindow.setContent(infowindowContent);
-				infowindow.open(map, marker);
-			});
-		}
-    });
+				window.setTimeout(function() {
+					infowindow.setContent(HTML.generateHTML(self.articleList()));
+					infowindow.open(map, markerCopy.marker);
+				}, 300);
 
-	//set visibility of marker; used in ViewModel to filter markers
-    this.isVisible = ko.observable(false);
+				if (markerCopy.marker.getAnimation() !== null) {
+					markerCopy.marker.setAnimation(null);
+				} else {
+					markerCopy.marker.setAnimation(google.maps.Animation.BOUNCE);
+					setTimeout(function() { markerCopy.marker.setAnimation(null); }, 1450);
+				};
+			};
 
-    this.isVisible.subscribe(function(currentState) {
-    	if (currentState) {
-    		marker.setMap(map);
-    	} else {
-    		marker.setMap(null);
-    	}
-    });
-
-    this.isVisible(true);
-
-    this.marker = ko.observable(marker);
-
-    markers.push(marker);
+		})(indexedNumber));
+	};
 };
 
 var map;
