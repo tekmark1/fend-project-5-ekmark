@@ -34,39 +34,45 @@ var venueList = [
 		}
 ];
 
+//Generates HTML. This function will take in the articleList array from the ViewModel and will produce the infowindow content.
 function HTMLModel() {
 
 	this.generateHTML = function(articles) {
 
 		var infowindowContent = "";
 
+		//run a loop through the articleList array and set the infowindowContent with this info.
 		for (var i = 0; i < articles.length; i++) {
 
 			var content = articles[i].content;
 			var name = articles[i].name;
 			var url = articles[i].url;
-			var address = articles[i].address;
-			var streetViewUrl = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + address + "";
-
-			infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetViewUrl + "'><div id='wikilinks'><li><a href='" + url + "''>" + content + "</a></li></div></div>";
+			var streetview = articles[i].streetview;
+			
+			infowindowContent = "<div class='popup'><h1>" + name + "</h1><img src='" + streetview + "'><div id='wikilinks'><li><a href='" + url + "''>" + content + "</a></li></div></div>";
 		};
 
 		return infowindowContent;
 	};
 };
 
+//instantiate a new HTMLModel for global use.
 var HTML = new HTMLModel();
 
+//ViewModel
 var ViewModel = function() {
 
 	var self = this;
 
+	//observableArray for article information. Information from self.articles will be pushed
+	//into this array. This array will then be used by model.generateHTML to create infowindowContent.
 	this.articleList = ko.observableArray();
 
-	this.article = function(name, url, address, content) {
+	//
+	this.article = function(name, url, streetview, content) {
 		this.name = name;
 		this.url = url;
-		this.address = address;
+		this.streetview = streetview;
 		this.content = content;
 	}
 
@@ -134,7 +140,7 @@ var ViewModel = function() {
 
 		var wikiUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + marker.name + '&limit=3&format=json&callback=wikiCallback';
 		
-		var wikiFail = 'Failed to get Wikipedia resources';
+
 
 		parameters = {
 			url: wikiUrl,
@@ -145,10 +151,33 @@ var ViewModel = function() {
 				var articles = response[1];
 				var content = articles[0];
 				var url = 'http://en.wikipedia.org/wiki/' + content;
+				var streetViewUrl = "http://maps.googleapis.com/maps/api/streetview?size=200x150&location=" + marker.address + "";
 
-				self.articleList.push(new self.article(marker.name, url, marker.address, content));
+				self.articleList.push(new self.article(marker.name, url, streetViewUrl, content));
 				
-			}
+			},
+			error: function(jqXHR, exception) {
+
+				self.articleList.removeAll();
+				var wikiFail = '';
+			
+		        	if (jqXHR.status === 0) {
+		        		wikiFail = 'Not connect.\n Verify Network.';
+		        	} else if (jqXHR.status == 404) {
+		            		wikiFail = 'Requested page not found. [404]';
+		        	} else if (jqXHR.status == 500) {
+		            		wikiFail = 'Internal Server Error [500].';
+				} else if (exception === 'parsererror') {
+		            		wikiFail = 'Requested JSON parse failed.';
+		        	} else if (exception === 'timeout') {
+		            		wikiFail = 'Time out error.';
+		        	} else if (exception === 'abort') {
+		            		wikiFail = 'Ajax request aborted.';
+		        	} else {
+		            		wikiFail = 'Uncaught Error.\n';
+				}
+		        	self.articleList.push(wikiFail);
+	        	} 
 		};
 		$.ajax(parameters);
 	};
@@ -211,6 +240,15 @@ var initMap = function() {
     });
 
 };
+
+function googleError() {
+
+	var $errorMap = $('#map');
+
+	if (typeof google === 'undefined') {
+    	$errorMap.append('<h2>Error loading or retrieving Google Map</h2>');
+    };
+}
 
 //wrap initMap() and ko bindings in a function so they can be run with google.api callback
 function runApp() {
