@@ -1,13 +1,55 @@
 html, body {
+
 	height: 100%;
-	margin: 0;
-	padding: 10px;
+
+
 }
 
-.row {
+#title {
 	text-align: center;
+	width: 100%;
+
+
+}
+.search-and-list {
+
+	padding-left: 7px;
+	width: 100%;
+
 }
 
+#search {
+	width: 100%;
+	margin-left: 7px;
+	border: 1px solid #CCCCB3;
+	border-top-left-radius: 5px 5px;
+	border-bottom-left-radius: 5px 5px;
+	border-top-right-radius: 5px 5px;
+	border-bottom-right-radius: 5px 5px;
+	background-color: #F5F5F0;
+}
+
+
+#venue-list {
+	padding-left: 7px;
+	list-style-type: none;
+}
+
+#venue-list li:hover {
+	color: blue;
+}
+
+.map-and-list {
+
+	height: 100%;
+	width: 100%;
+}
 #map {
-	height: 600px;
+	text-align: center;
+	height: 100%;
+	border-top-left-radius: 5px 5px;
+	border-bottom-left-radius: 5px 5px;
+	border-top-right-radius: 5px 5px;
+	border-bottom-right-radius: 5px 5px;
+
 }
